@@ -132,23 +132,33 @@ p { color: var(--gray-600); line-height: 1.5; }
 
 /* --- Listado de ítems del pedido --- */
 .item-row {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   border: 1px solid var(--gray-200);
   border-radius: 10px;
   padding: 12px;
   margin-bottom: 10px;
-  position: relative;
+}
+.item-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.item-row-header .label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .item-row .remove {
-  position: absolute;
-  top: 8px;
-  right: 8px;
   background: none;
   border: none;
   color: var(--gray-400);
   cursor: pointer;
   font-size: 16px;
+  line-height: 1;
 }
 
 /* --- Adjuntos --- */

@@ -237,8 +237,11 @@ async function handleSubmit() {
         </div>
 
         <h2>Detalle del pedido</h2>
-        <div v-for="(item, i) in items" :key="i" class="item-row" :style="{ gridTemplateColumns: `repeat(${columns.length}, 1fr)` }">
-          <button v-if="items.length > 1" type="button" class="remove" @click="removeItem(i)">✕</button>
+        <div v-for="(item, i) in items" :key="i" class="item-row">
+          <div class="item-row-header">
+            <span class="label">Ítem {{ i + 1 }}</span>
+            <button v-if="items.length > 1" type="button" class="remove" @click="removeItem(i)">✕ Quitar</button>
+          </div>
           <div v-for="col in columns" :key="col.key" class="field" style="margin-bottom:0;">
             <label>{{ col.label }}</label>
             <input v-if="col.type === 'text' || col.type === 'number'" v-model="item[col.key]" :type="col.type === 'number' ? 'number' : 'text'">
