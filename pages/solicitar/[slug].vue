@@ -130,23 +130,32 @@ function parseItemAttachment(value: string | undefined): AttachmentUploaded | nu
   }
 }
 
+// Errores de subida por celda — antes solo se guardaban en attachmentError, que se muestra
+// en la sección de Adjuntos generales más abajo: si fallaba la subida de un ítem, no se veía
+// ningún aviso cerca de esa fila y parecía que "no pasaba nada" al elegir el archivo.
+const itemUploadErrors = reactive<Record<string, string>>({})
+
 async function handleItemFileChange(rowIndex: number, col: WorkOrderColumn, event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
+  const cellId = `${rowIndex}:${col.key}`
+  delete itemUploadErrors[cellId]
   if (!file || !profile.value) return
 
   if (!MIME_EXT[file.type]) {
-    attachmentError.value = `"${file.name}" no es un formato soportado`
+    itemUploadErrors[cellId] = file.type
+      ? `Formato no soportado (${file.type}). Usa ${col.type === 'image' ? 'JPG, PNG o WEBP' : 'PDF o TXT'}.`
+      : 'No se pudo detectar el tipo de archivo. Probá con otro archivo.'
+    ;(event.target as HTMLInputElement).value = ''
     return
   }
 
-  const cellId = `${rowIndex}:${col.key}`
   uploadingItemCell.value = cellId
   try {
     const base64 = await fileToBase64(file)
     const res = await pedidos.subirAdjunto(profile.value.id, base64, file.name, file.type)
     items.value[rowIndex]![col.key] = JSON.stringify(res.data)
-  } catch {
-    attachmentError.value = `No se pudo subir "${file.name}"`
+  } catch (e: unknown) {
+    itemUploadErrors[cellId] = (e as { data?: { error?: string } })?.data?.error || `No se pudo subir "${file.name}". Intenta de nuevo.`
   } finally {
     uploadingItemCell.value = null
   }
@@ -155,6 +164,7 @@ async function handleItemFileChange(rowIndex: number, col: WorkOrderColumn, even
 
 function clearItemAttachment(rowIndex: number, col: WorkOrderColumn) {
   items.value[rowIndex]![col.key] = ''
+  delete itemUploadErrors[`${rowIndex}:${col.key}`]
 }
 
 async function handleSubmit() {
@@ -264,6 +274,9 @@ async function handleSubmit() {
                   @change="handleItemFileChange(i, col, $event)"
                 >
               </label>
+              <p v-if="itemUploadErrors[`${i}:${col.key}`]" class="hint" style="color:var(--red-600);">
+                {{ itemUploadErrors[`${i}:${col.key}`] }}
+              </p>
             </template>
           </div>
         </div>
