@@ -1,0 +1,122 @@
+service: clichin-pedidos-ssr
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  memorySize: 512
+  timeout: 15
+  versionFunctions: false
+  environment:
+    NUXT_PUBLIC_API_AUTH_BASE: ${self:custom.apiAuthBase.${sls:stage}}
+    NUXT_PUBLIC_API_OFFICINA_BASE: ${self:custom.apiOfficinaBase.${sls:stage}}
+    NUXT_PUBLIC_SITE_URL: ${self:custom.siteUrl.${sls:stage}}
+    # NUXT_APP_CDN_URL es build-time (se pasa al correr `npm run build`, no al runtime del Lambda)
+
+custom:
+  # Mismo API Gateway de auth que ya usa caja-registradora/frontend/booking-ssr/tienda-ssr —
+  # el endpoint público /public/profiles/{slug} vive ahí. officina es el backend nuevo del
+  # segundo add-on (control de pedidos a fábricas/talleres artesanales).
+  apiAuthBase:
+    dev: https://0dpp2nb3rd.execute-api.us-east-1.amazonaws.com
+    prod: https://qbjvrgskk7.execute-api.us-east-1.amazonaws.com
+  apiOfficinaBase:
+    dev: https://t8rcg0xfea.execute-api.us-east-1.amazonaws.com
+    prod: https://j935t9x4mk.execute-api.us-east-1.amazonaws.com
+  siteUrl:
+    dev: https://dev.pedidos.clichin.app
+    prod: https://pedidos.clichin.app
+
+  corsOrigins:
+    dev:
+      - https://dev.pedidos.clichin.app
+    prod:
+      - https://pedidos.clichin.app
+
+  assetsBucket:
+    dev: clichin-pedidos-assets-dev
+    prod: clichin-pedidos-assets-prod
+
+functions:
+  nuxt:
+    handler: .output/server/index.handler
+    events:
+      - httpApi:
+          path: /
+          method: ANY
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+
+plugins:
+  - serverless-offline
+
+package:
+  patterns:
+    - '!**'
+    - '.output/server/**'
+
+resources:
+  Conditions:
+    IsProd: !Equals ['${sls:stage}', 'prod']
+
+  Resources:
+    PedidosDomainName:
+      Type: AWS::ApiGatewayV2::DomainName
+      Condition: IsProd
+      Properties:
+        DomainName: pedidos.clichin.app
+        DomainNameConfigurations:
+          - CertificateArn: arn:aws:acm:us-east-1:996197173188:certificate/99f756e3-05a0-4727-9485-f4fc2f05b1a1
+            EndpointType: REGIONAL
+
+    PedidosApiMapping:
+      Type: AWS::ApiGatewayV2::ApiMapping
+      Condition: IsProd
+      Properties:
+        ApiId: !Ref HttpApi
+        DomainName: !Ref PedidosDomainName
+        Stage: !Ref HttpApiStage
+
+    PedidosAssetsBucket:
+      Type: AWS::S3::Bucket
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
+      Properties:
+        BucketName: ${self:custom.assetsBucket.${sls:stage}}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+        OwnershipControls:
+          Rules:
+            - ObjectOwnership: BucketOwnerPreferred
+        WebsiteConfiguration:
+          IndexDocument: index.html
+        CorsConfiguration:
+          CorsRules:
+            - AllowedOrigins: ${self:custom.corsOrigins.${sls:stage}}
+              AllowedMethods: [GET, HEAD]
+              AllowedHeaders: ['*']
+              MaxAge: 3000
+    PedidosAssetsBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref PedidosAssetsBucket
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal: '*'
+              Action: 's3:GetObject'
+              Resource: !Sub '${PedidosAssetsBucket.Arn}/*'
+
+  Outputs:
+    PedidosRegionalDomainName:
+      Condition: IsProd
+      Value: !GetAtt PedidosDomainName.RegionalDomainName
+    PedidosRegionalHostedZoneId:
+      Condition: IsProd
+      Value: !GetAtt PedidosDomainName.RegionalHostedZoneId
