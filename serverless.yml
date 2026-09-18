@@ -29,9 +29,13 @@ custom:
     dev: https://dev.pedidos.clichin.app
     prod: https://pedidos.clichin.app
 
+  # dev no tiene dominio custom (solo prod tiene el cert ACM) — la página se sirve desde la
+  # URL cruda de execute-api, así que el bucket de assets tiene que permitir ESE origen, no
+  # "dev.pedidos.clichin.app" (que no resuelve a nada real todavía). Bug real encontrado
+  # probando: los .js del build se bloqueaban por CORS y rompían toda la app en dev.
   corsOrigins:
     dev:
-      - https://dev.pedidos.clichin.app
+      - '*'
     prod:
       - https://pedidos.clichin.app
 
